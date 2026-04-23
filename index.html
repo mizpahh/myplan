@@ -213,7 +213,6 @@ const B=[{id:'move',n:'Movement',c:'#98e8cc',e:'🏃‍♀️'},{id:'work',n:'Wo
 const DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const HRS=Array.from({length:18},(_,i)=>i+5);
 
-// Your Google Calendar events (next 5 weeks, LA time)
 const GC=[
   {id:'gc1',t:'therapy 🌿',d:'2026-04-22',s:'14:00',e:'15:00',cal:'mustdo',g:1},
   {id:'gc2',t:'work 💼',d:'2026-04-22',s:'06:00',e:'14:45',cal:'work',g:1},
@@ -251,8 +250,8 @@ const GC=[
   {id:'gc33',t:"Alana's birthday 🎂",d:'2026-07-17',s:'00:00',e:'23:59',al:1,cal:'birthdays',g:1},
 ];
 
-let uEvs=JSON.parse(localStorage.getItem('mp_e')||'[]');
-let tasks=JSON.parse(localStorage.getItem('mp_t')||'[]');
+let uEvs=[];
+let tasks=[];
 let day=fd(new Date()),eid=null;
 
 function fd(d){return d.toISOString().split('T')[0];}
@@ -264,8 +263,19 @@ function ft(h,m=0){const ap=h>=12?'pm':'am';const hh=h%12||12;return m?`${hh}:${
 function gb(id){return B.find(b=>b.id===id)||B[5];}
 function dk(h){const r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16);return`rgb(${Math.floor(r*.5)},${Math.floor(g*.5)},${Math.floor(b*.5)})`;}
 function all(){return[...GC,...uEvs];}
-function save(){localStorage.setItem('mp_e',JSON.stringify(uEvs));localStorage.setItem('mp_t',JSON.stringify(tasks));}
 function wk(ds){const d=pd(ds);const su=new Date(d);su.setDate(d.getDate()-d.getDay());return Array.from({length:7},(_,i)=>fd(ad(su,i)));}
+
+async function loadData(){
+  try{
+    const[evRes,tkRes]=await Promise.all([fetch('/api/events'),fetch('/api/tasks')]);
+    uEvs=await evRes.json();
+    tasks=await tkRes.json();
+  }catch(err){
+    uEvs=JSON.parse(localStorage.getItem('mp_e')||'[]');
+    tasks=JSON.parse(localStorage.getItem('mp_t')||'[]');
+  }
+  rDay();rBkt();
+}
 
 function go(p){
   document.querySelectorAll('.pg').forEach(v=>v.classList.remove('on'));
@@ -346,14 +356,20 @@ function rBkt(){
   });
 }
 
-function addTask(){
+async function addTask(){
   const n=document.getElementById('tn').value.trim(),bkt=document.getElementById('tb').value,dur=parseInt(document.getElementById('td').value)||0;
   if(!n||!bkt)return;
-  tasks.push({id:Date.now().toString(),n,bkt,dur});
+  const res=await fetch('/api/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({n,bkt,dur})});
+  const task=await res.json();
+  tasks.push(task);
   document.getElementById('tn').value='';document.getElementById('td').value='';
-  save();rBkt();
+  rBkt();
 }
-function rmT(id){tasks=tasks.filter(t=>t.id!==id);save();rBkt();}
+async function rmT(id){
+  tasks=tasks.filter(t=>t.id!==id);
+  await fetch(`/api/tasks?id=${id}`,{method:'DELETE'});
+  rBkt();
+}
 
 async function getSug(){
   const sc=document.getElementById('sc');
@@ -411,16 +427,30 @@ function openEdit(id){
   document.getElementById('ov').classList.add('on');
 }
 function closeM(){document.getElementById('ov').classList.remove('on');}
-function saveEv(){
+async function saveEv(){
   const t=document.getElementById('et').value.trim(),d=document.getElementById('ed').value,bkt=document.getElementById('eb').value,s=document.getElementById('es').value,e=document.getElementById('ee').value,notes=document.getElementById('en').value.trim();
   if(!t||!d||!s||!e)return;
-  if(eid){const i=uEvs.findIndex(v=>v.id===eid);uEvs[i]={...uEvs[i],t,d,bkt,s,e,notes};}
-  else uEvs.push({id:Date.now().toString(),t,d,bkt,s,e,notes,cal:'user',g:0,al:0});
-  save();closeM();rDay();
+  if(eid){
+    const i=uEvs.findIndex(v=>v.id===eid);
+    const updated={...uEvs[i],t,d,bkt,s,e,notes};
+    await fetch(`/api/events?id=${eid}`,{method:'DELETE'});
+    const res=await fetch('/api/events',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(updated)});
+    uEvs[i]=await res.json();
+  } else {
+    const res=await fetch('/api/events',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({t,d,bkt,s,e,notes})});
+    const ev=await res.json();
+    uEvs.push(ev);
+  }
+  closeM();rDay();
 }
-function delEv(){if(!eid)return;uEvs=uEvs.filter(v=>v.id!==eid);save();closeM();rDay();}
+async function delEv(){
+  if(!eid)return;
+  uEvs=uEvs.filter(v=>v.id!==eid);
+  await fetch(`/api/events?id=${eid}`,{method:'DELETE'});
+  closeM();rDay();
+}
 document.getElementById('ov').onclick=ev=>{if(ev.target===document.getElementById('ov'))closeM();};
-rDay();setInterval(rDay,60000);
+loadData();setInterval(loadData,60000);
 </script>
 </body>
 </html>

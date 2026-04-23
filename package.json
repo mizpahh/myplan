@@ -1,0 +1,23 @@
+{
+  "name": "myplan",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mizpahh/myplan.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/mizpahh/myplan/issues"
+  },
+  "homepage": "https://github.com/mizpahh/myplan#readme",
+  "description": "",
+  "dependencies": {
+    "@vercel/blob": "^2.3.3"
+  }
+}
