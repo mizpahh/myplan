@@ -1,12 +1,12 @@
-import { put, head, get } from '@vercel/blob';
+import { put, list } from '@vercel/blob';
 
-const BLOB_KEY = 'myplan-tasks.json';
+const PATHNAME = 'myplan-tasks.json';
 
 async function readTasks() {
   try {
-    const existing = await head(BLOB_KEY).catch(() => null);
-    if (!existing) return [];
-    const res = await fetch(existing.url);
+    const { blobs } = await list({ prefix: PATHNAME });
+    if (!blobs.length) return [];
+    const res = await fetch(blobs[0].url);
     return await res.json();
   } catch {
     return [];
@@ -14,7 +14,7 @@ async function readTasks() {
 }
 
 async function writeTasks(tasks) {
-  await put(BLOB_KEY, JSON.stringify(tasks), {
+  await put(PATHNAME, JSON.stringify(tasks), {
     access: 'public',
     contentType: 'application/json',
     addRandomSuffix: false,
@@ -28,8 +28,7 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   if (req.method === 'GET') {
-    const tasks = await readTasks();
-    return res.status(200).json(tasks);
+    return res.status(200).json(await readTasks());
   }
 
   if (req.method === 'POST') {
@@ -42,8 +41,7 @@ export default async function handler(req, res) {
 
   if (req.method === 'DELETE') {
     const { id } = req.query;
-    let tasks = await readTasks();
-    tasks = tasks.filter(t => t.id !== id);
+    const tasks = (await readTasks()).filter(t => t.id !== id);
     await writeTasks(tasks);
     return res.status(200).json({ ok: true });
   }

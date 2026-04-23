@@ -1,12 +1,12 @@
-import { put, head } from '@vercel/blob';
+import { put, list } from '@vercel/blob';
 
-const BLOB_KEY = 'myplan-events.json';
+const PATHNAME = 'myplan-events.json';
 
 async function readEvents() {
   try {
-    const existing = await head(BLOB_KEY).catch(() => null);
-    if (!existing) return [];
-    const res = await fetch(existing.url);
+    const { blobs } = await list({ prefix: PATHNAME });
+    if (!blobs.length) return [];
+    const res = await fetch(blobs[0].url);
     return await res.json();
   } catch {
     return [];
@@ -14,7 +14,7 @@ async function readEvents() {
 }
 
 async function writeEvents(events) {
-  await put(BLOB_KEY, JSON.stringify(events), {
+  await put(PATHNAME, JSON.stringify(events), {
     access: 'public',
     contentType: 'application/json',
     addRandomSuffix: false,
@@ -28,13 +28,12 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   if (req.method === 'GET') {
-    const events = await readEvents();
-    return res.status(200).json(events);
+    return res.status(200).json(await readEvents());
   }
 
   if (req.method === 'POST') {
     const events = await readEvents();
-    const event = { id: Date.now().toString(), ...req.body, g: 0, al: 0, cal: 'user' };
+    const event = { id: Date.now().toString(), ...req.body, g: 0, al: req.body.al ?? 0, cal: req.body.cal || 'user' };
     events.push(event);
     await writeEvents(events);
     return res.status(201).json(event);
@@ -42,8 +41,7 @@ export default async function handler(req, res) {
 
   if (req.method === 'DELETE') {
     const { id } = req.query;
-    let events = await readEvents();
-    events = events.filter(e => e.id !== id);
+    const events = (await readEvents()).filter(e => e.id !== id);
     await writeEvents(events);
     return res.status(200).json({ ok: true });
   }
