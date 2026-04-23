@@ -8,7 +8,8 @@ async function readEvents() {
     if (!blobs.length) return [];
     const res = await fetch(blobs[0].url);
     return await res.json();
-  } catch {
+  } catch (e) {
+    console.error('readEvents error:', e);
     return [];
   }
 }
@@ -27,24 +28,31 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  if (req.method === 'GET') {
-    return res.status(200).json(await readEvents());
-  }
+  try {
+    if (req.method === 'GET') {
+      return res.status(200).json(await readEvents());
+    }
 
-  if (req.method === 'POST') {
-    const events = await readEvents();
-    const event = { id: Date.now().toString(), ...req.body, g: 0, al: req.body.al ?? 0, cal: req.body.cal || 'user' };
-    events.push(event);
-    await writeEvents(events);
-    return res.status(201).json(event);
-  }
+    if (req.method === 'POST') {
+      let body = req.body;
+      if (typeof body === 'string') body = JSON.parse(body);
+      const events = await readEvents();
+      const event = { id: Date.now().toString(), ...body, g: 0, al: body.al ?? 0, cal: body.cal || 'user' };
+      events.push(event);
+      await writeEvents(events);
+      return res.status(201).json(event);
+    }
 
-  if (req.method === 'DELETE') {
-    const { id } = req.query;
-    const events = (await readEvents()).filter(e => e.id !== id);
-    await writeEvents(events);
-    return res.status(200).json({ ok: true });
-  }
+    if (req.method === 'DELETE') {
+      const { id } = req.query;
+      const events = (await readEvents()).filter(e => e.id !== id);
+      await writeEvents(events);
+      return res.status(200).json({ ok: true });
+    }
 
-  res.status(405).json({ error: 'Method not allowed' });
+    res.status(405).json({ error: 'Method not allowed' });
+  } catch (err) {
+    console.error('handler error:', err);
+    res.status(500).json({ error: err.message, name: err.name });
+  }
 }
