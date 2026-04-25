@@ -20,6 +20,7 @@ async function writeTasks(tasks) {
     contentType: 'application/json',
     addRandomSuffix: false,
     allowOverwrite: true,
+    cacheControlMaxAge: 0,
   });
 }
 
