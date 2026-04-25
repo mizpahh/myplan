@@ -6,7 +6,7 @@ async function readTasks() {
   try {
     const { blobs } = await list({ prefix: PATHNAME });
     if (!blobs.length) return [];
-    const res = await fetch(blobs[0].url);
+    const res = await fetch(blobs[0].url, { cache: 'no-store' });
     return await res.json();
   } catch (e) {
     console.error('readTasks error:', e);
