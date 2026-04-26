@@ -1,26 +1,20 @@
-import { put, list } from '@vercel/blob';
-
-const PATHNAME = 'myplan-tasks.json';
+const GH_TOKEN = process.env.GH_TOKEN;
+const GIST_ID = process.env.TASKS_GIST_ID;
+const FILENAME = 'tasks.json';
 
 async function readTasks() {
-  try {
-    const { blobs } = await list({ prefix: PATHNAME });
-    if (!blobs.length) return [];
-    const res = await fetch(blobs[0].url, { cache: 'no-store' });
-    return await res.json();
-  } catch (e) {
-    console.error('readTasks error:', e);
-    return [];
-  }
+  const res = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+    headers: { Authorization: `token ${GH_TOKEN}`, Accept: 'application/vnd.github.v3+json' },
+  });
+  const data = await res.json();
+  return JSON.parse(data.files[FILENAME].content || '[]');
 }
 
 async function writeTasks(tasks) {
-  await put(PATHNAME, JSON.stringify(tasks), {
-    access: 'public',
-    contentType: 'application/json',
-    addRandomSuffix: false,
-    allowOverwrite: true,
-    cacheControlMaxAge: 0,
+  await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+    method: 'PATCH',
+    headers: { Authorization: `token ${GH_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ files: { [FILENAME]: { content: JSON.stringify(tasks) } } }),
   });
 }
 
@@ -54,7 +48,6 @@ export default async function handler(req, res) {
 
     res.status(405).json({ error: 'Method not allowed' });
   } catch (err) {
-    console.error('handler error:', err);
-    res.status(500).json({ error: err.message, name: err.name });
+    res.status(500).json({ error: err.message });
   }
 }
